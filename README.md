@@ -326,7 +326,7 @@ VITE_API_URL=https://your-luna-backend.example.com/api
 
 8. Deploy the project.
 
-The current frontend uses `/api` for normal Axios calls and reads `VITE_API_URL` for direct streaming/settings calls. The backend URL must include the `/api` suffix when the deployed frontend expects API routes below that base.
+The frontend uses `VITE_API_URL` for all API calls when it is set, and falls back to `/api` for local development through the Vite proxy. Set `VITE_API_URL` to the complete backend API base ending in `/api`, for example `https://your-luna-backend.example.com/api`.
 
 ### Configure the backend for the Vercel frontend
 

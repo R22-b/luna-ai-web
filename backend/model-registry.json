@@ -1,0 +1,191 @@
+{
+  "groq": {
+    "name": "Groq",
+    "capabilities": ["chat", "code", "fast"],
+    "vision": false,
+    "maxTokens": 32768,
+    "free": true,
+    "noKeyNeeded": false,
+    "priority": 1,
+    "models": ["llama-3.1-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768", "gemma2-9b-it"]
+  },
+  "gemini": {
+    "name": "Google Gemini",
+    "capabilities": ["chat", "vision", "research", "long-context", "code"],
+    "vision": true,
+    "maxTokens": 1000000,
+    "free": true,
+    "noKeyNeeded": false,
+    "priority": 2,
+    "models": ["gemini-1.5-flash", "gemini-1.5-flash-8b", "gemini-2.0-flash-exp"]
+  },
+  "openrouter": {
+    "name": "OpenRouter",
+    "capabilities": ["chat", "code", "creative", "vision"],
+    "vision": true,
+    "maxTokens": 128000,
+    "free": true,
+    "noKeyNeeded": false,
+    "priority": 3,
+    "models": [
+      "meta-llama/llama-3.1-70b-instruct:free",
+      "meta-llama/llama-3.1-8b-instruct:free",
+      "mistralai/mistral-7b-instruct:free",
+      "google/gemma-2-9b-it:free",
+      "microsoft/phi-3-mini-128k-instruct:free",
+      "qwen/qwen-2-7b-instruct:free",
+      "openchat/openchat-7b:free",
+      "nousresearch/hermes-3-llama-3.1-405b:free"
+    ]
+  },
+  "nvidia": {
+    "name": "NVIDIA NIM",
+    "capabilities": ["chat", "code", "reasoning"],
+    "vision": false,
+    "maxTokens": 128000,
+    "free": true,
+    "noKeyNeeded": false,
+    "priority": 4,
+    "models": ["meta/llama-3.1-70b-instruct", "meta/llama-3.1-8b-instruct", "mistralai/mixtral-8x7b-instruct-v0.1", "nvidia/nemotron-4-340b-instruct"]
+  },
+  "cohere": {
+    "name": "Cohere",
+    "capabilities": ["chat", "research", "rag"],
+    "vision": false,
+    "maxTokens": 128000,
+    "free": true,
+    "noKeyNeeded": false,
+    "priority": 5,
+    "models": ["command-r-plus", "command-r", "command"]
+  },
+  "mistral": {
+    "name": "Mistral AI",
+    "capabilities": ["chat", "code"],
+    "vision": false,
+    "maxTokens": 32768,
+    "free": true,
+    "noKeyNeeded": false,
+    "priority": 6,
+    "models": ["open-mistral-7b", "open-mixtral-8x7b", "mistral-small-latest"]
+  },
+  "together": {
+    "name": "Together AI",
+    "capabilities": ["chat", "code", "creative"],
+    "vision": false,
+    "maxTokens": 64000,
+    "free": true,
+    "noKeyNeeded": false,
+    "priority": 7,
+    "models": ["meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo", "meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo", "mistralai/Mixtral-8x7B-Instruct-v0.1"]
+  },
+  "huggingface": {
+    "name": "HuggingFace",
+    "capabilities": ["chat", "specialized"],
+    "vision": false,
+    "maxTokens": 8192,
+    "free": true,
+    "noKeyNeeded": false,
+    "priority": 8,
+    "models": ["mistralai/Mistral-7B-Instruct-v0.3", "HuggingFaceH4/zephyr-7b-beta"]
+  },
+  "deepseek": {
+    "name": "DeepSeek",
+    "capabilities": ["chat", "code"],
+    "vision": false,
+    "maxTokens": 64000,
+    "free": true,
+    "noKeyNeeded": false,
+    "priority": 9,
+    "models": ["deepseek-chat", "deepseek-coder"]
+  },
+  "cerebras": {
+    "name": "Cerebras",
+    "capabilities": ["chat", "fast"],
+    "vision": false,
+    "maxTokens": 8192,
+    "free": true,
+    "noKeyNeeded": false,
+    "priority": 10,
+    "models": ["llama3.1-70b", "llama3.1-8b"]
+  },
+  "sambanova": {
+    "name": "SambaNova",
+    "capabilities": ["chat", "large"],
+    "vision": false,
+    "maxTokens": 64000,
+    "free": true,
+    "noKeyNeeded": false,
+    "priority": 11,
+    "models": ["Meta-Llama-3.1-70B-Instruct", "Meta-Llama-3.1-8B-Instruct"]
+  },
+  "xai": {
+    "name": "xAI / Grok",
+    "capabilities": ["chat", "vision", "web-search"],
+    "vision": true,
+    "maxTokens": 131072,
+    "free": true,
+    "noKeyNeeded": false,
+    "priority": 12,
+    "models": ["grok-beta", "grok-vision-beta"]
+  },
+  "moonshot": {
+    "name": "Moonshot / Kimi",
+    "capabilities": ["chat", "long-context"],
+    "vision": false,
+    "maxTokens": 200000,
+    "free": true,
+    "noKeyNeeded": false,
+    "priority": 13,
+    "models": ["moonshot-v1-8k", "moonshot-v1-32k", "moonshot-v1-128k"]
+  },
+  "fireworks": {
+    "name": "Fireworks AI",
+    "capabilities": ["chat", "code", "fast"],
+    "vision": false,
+    "maxTokens": 32768,
+    "free": true,
+    "noKeyNeeded": false,
+    "priority": 14,
+    "models": ["accounts/fireworks/models/llama-v3p1-70b-instruct", "accounts/fireworks/models/mixtral-8x7b-instruct"]
+  },
+  "ai21": {
+    "name": "AI21 Labs",
+    "capabilities": ["chat", "writing"],
+    "vision": false,
+    "maxTokens": 8192,
+    "free": true,
+    "noKeyNeeded": false,
+    "priority": 15,
+    "models": ["jamba-instruct", "j2-ultra"]
+  },
+  "qwen": {
+    "name": "Qwen (Alibaba)",
+    "capabilities": ["chat", "multilingual"],
+    "vision": true,
+    "maxTokens": 32768,
+    "free": true,
+    "noKeyNeeded": false,
+    "priority": 16,
+    "models": ["qwen-turbo", "qwen-plus", "qwen-max"]
+  },
+  "perplexity": {
+    "name": "Perplexity AI",
+    "capabilities": ["chat", "web-search", "research"],
+    "vision": false,
+    "maxTokens": 127072,
+    "free": true,
+    "noKeyNeeded": false,
+    "priority": 17,
+    "models": ["llama-3.1-sonar-small-128k-online", "llama-3.1-sonar-large-128k-online"]
+  },
+  "pollinations": {
+    "name": "Pollinations",
+    "capabilities": ["chat", "image-gen"],
+    "vision": false,
+    "maxTokens": 4096,
+    "free": true,
+    "noKeyNeeded": true,
+    "priority": 18,
+    "models": ["openai", "mistral", "llama"]
+  }
+}

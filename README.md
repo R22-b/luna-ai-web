@@ -431,9 +431,15 @@ Follow [R22-b on GitHub](https://github.com/R22-b) for future updates and announ
 
 ## Credits and License
 
-Luna AI Web was built by **Ravikiran A**. The project is released under the MIT License. The Luna identity used by the application is:
+Luna AI Web was built by **Ravikiran A** and is **MIT licensed**. This is an open-source project: you may use, copy, modify, merge, publish, distribute, sublicense, and sell copies of the software, subject to the terms of the MIT License. The complete license text should be included in a `LICENSE` file in the repository. The Luna identity used by the application is:
 
 > **Luna AI 🌙 — Built by Ravikiran A · github.com/R22-b**
+
+### MIT License Summary
+
+Copyright (c) Ravikiran A
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files, to use the software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and sell copies, subject to the conditions of the MIT License. The software is provided “as is”, without warranty of any kind. See the official [MIT License text](https://opensource.org/license/mit) for the full terms.
 
 ## References
 

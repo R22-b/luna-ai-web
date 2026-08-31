@@ -13,10 +13,11 @@ const STATUS_COLORS = {
   failed:   'text-danger  bg-danger/10  border-danger/20',
   nokey:    'text-slate-400 bg-surface2  border-border',
   testing:  'text-accent  bg-accent/10  border-accent/20',
+  unknown:  'text-slate-400 bg-surface2  border-border',
 };
 
 const STATUS_DOTS = {
-  healthy: '🟢', limited: '🟡', failed: '🔴', nokey: '⚪', testing: '🔵',
+  healthy: '🟢', limited: '🟡', failed: '🔴', nokey: '⚪',   testing: '🔵', unknown: '🔵',
 };
 
 function ProviderCard({ def, health, onSave }) {
@@ -28,9 +29,10 @@ function ProviderCard({ def, health, onSave }) {
   const statusKey = def.key === 'POLLINATIONS_API_KEY' ? 'nokey'
     : testing ? 'testing'
     : !def.configured ? 'nokey'
-    : health?.alive === false ? 'failed'
-    : health?.errors > 0 ? 'limited'
-    : 'healthy';
+    : health?.status === 'limited' ? 'limited'
+    : health?.status === 'failed' || health?.alive === false ? 'failed'
+    : health?.status === 'healthy' ? 'healthy'
+    : 'unknown';
 
   const save = async (rawValue = value, silent = false) => {
     const trimmed = rawValue.trim();
@@ -80,7 +82,7 @@ function ProviderCard({ def, health, onSave }) {
           </a>
         </div>
         <span className={`text-xs px-2 py-0.5 rounded-full border ${STATUS_COLORS[statusKey]}`}>
-          {STATUS_DOTS[statusKey]} {statusKey === 'nokey' ? 'Not configured' : statusKey === 'testing' ? 'Testing...' : statusKey}
+          {STATUS_DOTS[statusKey]} {statusKey === 'nokey' ? 'Not configured' : statusKey === 'testing' ? 'Testing...' : statusKey === 'unknown' ? 'Not tested' : statusKey}
         </span>
       </div>
 

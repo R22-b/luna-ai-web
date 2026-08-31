@@ -47,6 +47,52 @@ const health = {};
 for (const id of Object.keys(PROVIDERS)) {
   health[id] = { alive: true, errors: 0, lastCheck: Date.now(), latency: 0, lastError: null };
 }
+const modelDiscovery = { groq: { at: 0, ids: [] } };
+const MODEL_DISCOVERY_TTL = 5 * 60 * 1000;
+
+function recordProviderFailure(id, err) {
+  const message = err?.message || String(err);
+  health[id].errors++;
+  health[id].lastCheck = Date.now();
+  health[id].lastError = message;
+  // Authentication/permission failures are limited; invalid models and other
+  // request failures are unhealthy. Both states are skipped by the router.
+  health[id].status = /HTTP 401|HTTP 403|permission|forbidden|unauthorized/i.test(message) ? 'limited' : 'failed';
+  health[id].alive = false;
+  setTimeout(() => {
+    health[id].alive = true;
+    health[id].status = 'unknown';
+    health[id].errors = 0;
+    health[id].lastError = null;
+  }, 60000);
+}
+
+async function resolveModel(id, requestedModel, sessionId) {
+  const configured = requestedModel || REGISTRY[id]?.models?.[0];
+  if (id !== 'groq') return configured;
+  const key = getKey(id, sessionId);
+  if (!key) return configured;
+  const cached = modelDiscovery.groq;
+  if (Date.now() - cached.at >= MODEL_DISCOVERY_TTL) {
+    try {
+      const response = await fetch(`${PROVIDERS.groq.baseUrl}/models`, {
+        headers: { Authorization: `Bearer ${key}` },
+      });
+      if (response.ok) {
+        const payload = await response.json();
+        cached.ids = (payload.data || []).map(model => model.id).filter(Boolean);
+        cached.at = Date.now();
+      }
+    } catch (err) {
+      console.warn(`⚠️ [groq] model discovery unavailable: ${err.message}`);
+    }
+  }
+  if (!cached.ids.length) return configured;
+  const selected = [requestedModel, ...REGISTRY.groq.models].find(model => cached.ids.includes(model));
+  if (!selected) throw new Error(`groq has no compatible configured model. Available models: ${cached.ids.slice(0, 8).join(', ')}`);
+  REGISTRY.groq.models = [selected, ...REGISTRY.groq.models.filter(model => model !== selected)];
+  return selected;
+}
 
 // Routing log per request (for Provider Info button)
 let lastRoutingLog = [];
@@ -84,6 +130,7 @@ function getProvidersForTask(taskType) {
 async function callOpenAI(id, messages, model, sessionId) {
   const p = PROVIDERS[id];
   const r = REGISTRY[id];
+  const activeModel = await resolveModel(id, model, sessionId);
   const headers = {
     'Content-Type': 'application/json',
     'Authorization': `Bearer ${getKey(id, sessionId)}`,
@@ -94,7 +141,7 @@ async function callOpenAI(id, messages, model, sessionId) {
   }
   const res = await fetch(`${p.baseUrl}/chat/completions`, {
     method: 'POST', headers,
-    body: JSON.stringify({ model: model || r.models[0], messages, max_tokens: 2048, temperature: 0.7 }),
+    body: JSON.stringify({ model: activeModel, messages, max_tokens: 2048, temperature: 0.7 }),
   });
   if (!res.ok) {
     const detail = (await res.text()).slice(0, 300);
@@ -111,7 +158,7 @@ async function callGemini(messages, sessionId) {
     .map(m => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] }));
   const systemInstruction = messages.find(m => m.role === 'system');
   const body = { contents };
-  if (systemInstruction) body.system_instruction = { parts: [{ text: systemInstruction.content }] };
+  if (systemInstruction) body.systemInstruction = { parts: [{ text: systemInstruction.content }] };
   const res = await fetch(
     `${PROVIDERS.gemini.baseUrl}/models/${r.models[0]}:generateContent?key=${getKey('gemini', sessionId)}`,
     { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
@@ -219,6 +266,9 @@ async function callProvider(id, messages, model, sessionId) {
     default: throw new Error(`Unknown format for ${id}`);
   }
   health[id].latency = Date.now() - start;
+  health[id].lastCheck = Date.now();
+  health[id].alive = true;
+  health[id].status = 'healthy';
   health[id].errors = 0;
   health[id].lastError = null;
   console.log(`✅ [${REGISTRY[id]?.name || id}] ${health[id].latency}ms`);
@@ -231,7 +281,7 @@ async function chat(messages, taskType = 'chat', preferredModel = null, sessionI
   lastRoutingLog = [];
 
   for (const id of providers) {
-    if (!health[id].alive && !sessionId) {
+    if (!health[id].alive && id !== 'pollinations') {
       lastRoutingLog.push({ provider: REGISTRY[id]?.name || id, status: 'skipped', reason: 'marked dead' });
       continue;
     }
@@ -252,12 +302,7 @@ async function chat(messages, taskType = 'chat', preferredModel = null, sessionI
       console.warn(`⚠️ [${id}] failed: ${errMsg}`);
       lastRoutingLog[lastRoutingLog.length - 1].status = 'failed';
       lastRoutingLog[lastRoutingLog.length - 1].reason = errMsg;
-      health[id].errors++;
-      health[id].lastError = errMsg;
-      if (health[id].errors >= 3) {
-        health[id].alive = false;
-        setTimeout(() => { health[id].alive = true; health[id].errors = 0; health[id].lastError = null; }, 60000);
-      }
+      recordProviderFailure(id, err);
     }
   }
   throw new Error('All AI providers failed. Please add API keys in Settings or try again later.');
@@ -269,7 +314,7 @@ async function chatStream(messages, taskType = 'chat', res, sessionId = null) {
   const log = [];
 
   for (const id of providers) {
-    if (!health[id].alive && !sessionId) continue;
+    if (!health[id].alive && id !== 'pollinations') continue;
     const key = getKey(id, sessionId);
     if (!key && id !== 'pollinations') continue;
 
@@ -282,6 +327,7 @@ async function chatStream(messages, taskType = 'chat', res, sessionId = null) {
       send({ type: 'provider', provider: r?.name || id });
 
       if (p.format === 'openai') {
+        const activeModel = await resolveModel(id, null, sessionId);
         const headers = {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${key}`,
@@ -289,7 +335,7 @@ async function chatStream(messages, taskType = 'chat', res, sessionId = null) {
         };
         const streamRes = await fetch(`${p.baseUrl}/chat/completions`, {
           method: 'POST', headers,
-          body: JSON.stringify({ model: r.models[0], messages, max_tokens: 2048, temperature: 0.7, stream: true }),
+          body: JSON.stringify({ model: activeModel, messages, max_tokens: 2048, temperature: 0.7, stream: true }),
         });
         if (!streamRes.ok) throw new Error(`${id} HTTP ${streamRes.status}`);
 
@@ -323,11 +369,7 @@ async function chatStream(messages, taskType = 'chat', res, sessionId = null) {
 
     } catch (err) {
       log.push({ provider: REGISTRY[id]?.name || id, status: 'failed', reason: err.message });
-      health[id].errors++;
-      if (health[id].errors >= 3) {
-        health[id].alive = false;
-        setTimeout(() => { health[id].alive = true; health[id].errors = 0; }, 60000);
-      }
+      recordProviderFailure(id, err);
     }
   }
   res.write(`data: ${JSON.stringify({ type: 'error', message: 'All providers failed' })}\n\n`);
@@ -339,6 +381,7 @@ function getHealthStatus(sessionId = null) {
     id,
     name: r.name,
     alive: health[id]?.alive ?? true,
+    status: health[id]?.status || (getKey(id, sessionId) ? 'unknown' : 'nokey'),
     hasKey: !!getKey(id, sessionId) || id === 'pollinations',
     latency: health[id]?.latency || 0,
     errors: health[id]?.errors || 0,
@@ -361,8 +404,13 @@ function getAllModels(sessionId = null) {
 
 async function testProvider(id, sessionId = null) {
   if (!PROVIDERS[id]) throw new Error(`Unknown provider: ${id}`);
-  const response = await callProvider(id, [{ role: 'user', content: 'Say "OK" and nothing else.' }], null, sessionId);
-  return { provider: REGISTRY[id]?.name || id, response };
+  try {
+    const response = await callProvider(id, [{ role: 'user', content: 'Say "OK" and nothing else.' }], null, sessionId);
+    return { provider: REGISTRY[id]?.name || id, response };
+  } catch (err) {
+    recordProviderFailure(id, err);
+    throw err;
+  }
 }
 
 function getLastRoutingLog() { return lastRoutingLog; }

@@ -1,11 +1,9 @@
 // MIT License — Luna AI Web | Built by Ravikiran A (github.com/R22-b)
 import { useState, useEffect } from 'react';
-import { Eye, EyeOff, Check, X, Loader, Shield, RefreshCw, Trash2 } from 'lucide-react';
+import { Eye, EyeOff, Loader, Shield, RefreshCw, Trash2, ExternalLink } from 'lucide-react';
 import toast from 'react-hot-toast';
-import axios from 'axios';
+import { chatAPI, settingsAPI } from '../utils/api';
 import { LUNA_PERSONALITY } from '../personality';
-
-const API_BASE = import.meta.env.VITE_API_URL || '';
 
 const TONES = ['friendly', 'professional', 'funny', 'formal', 'creative'];
 
@@ -21,7 +19,7 @@ const STATUS_DOTS = {
   healthy: '🟢', limited: '🟡', failed: '🔴', nokey: '⚪', testing: '🔵',
 };
 
-function ProviderCard({ def, health, onSave, onTest }) {
+function ProviderCard({ def, health, onSave }) {
   const [value, setValue] = useState('');
   const [show, setShow]   = useState(false);
   const [saving, setSaving] = useState(false);
@@ -38,8 +36,8 @@ function ProviderCard({ def, health, onSave, onTest }) {
     if (!value.trim()) return toast.error('Paste an API key first!');
     setSaving(true);
     try {
-      await axios.post(`${API_BASE}/api/settings/keys`, { [def.key]: value.trim() });
-      setValue(''); toast.success(`${def.label} key saved! 🔒`);
+      await settingsAPI.saveKeys({ [def.key]: value.trim() });
+      setValue(''); toast.success(`${def.label} key saved to this browser session! 🔒`);
       onSave();
     } catch { toast.error('Failed to save key'); }
     finally { setSaving(false); }
@@ -48,12 +46,22 @@ function ProviderCard({ def, health, onSave, onTest }) {
   const test = async () => {
     setTesting(true);
     try {
-      const { data } = await axios.post(`${API_BASE}/api/settings/test`, { provider: def.key });
+      const { data } = await settingsAPI.testProvider(def.key);
       if (data.ok) toast.success(`${def.label} is working! 🟢`);
       else toast.error(`${def.label} failed: ${data.error}`);
       onSave();
-    } catch { toast.error('Test failed'); }
-    finally { setTesting(false); }
+    } catch { toast.error('Test failed');     } finally { setTesting(false); }
+  };
+
+  const clear = async () => {
+    setSaving(true);
+    try {
+      await settingsAPI.saveKeys({}, [def.key]);
+      setValue('');
+      toast.success(`${def.label} key removed from this browser session.`);
+      onSave();
+    } catch { toast.error('Failed to remove key'); }
+    finally { setSaving(false); }
   };
 
   return (
@@ -62,6 +70,9 @@ function ProviderCard({ def, health, onSave, onTest }) {
         <div>
           <p className="text-sm font-semibold text-white">{def.label}</p>
           <p className="text-xs text-slate-500">{def.description}</p>
+          <a href={def.keyUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 mt-2 text-xs text-primary hover:text-white transition-colors">
+            Get an API key <ExternalLink size={11} />
+          </a>
         </div>
         <span className={`text-xs px-2 py-0.5 rounded-full border ${STATUS_COLORS[statusKey]}`}>
           {STATUS_DOTS[statusKey]} {statusKey === 'nokey' ? 'Not configured' : statusKey === 'testing' ? 'Testing...' : statusKey}
@@ -87,7 +98,7 @@ function ProviderCard({ def, health, onSave, onTest }) {
               {show ? <EyeOff size={14} /> : <Eye size={14} />}
             </button>
           </div>
-          {def.configured && (
+          {def.configured && def.category === 'AI' && (
             <button onClick={test} disabled={testing}
               className="px-3 py-2 bg-surface2 border border-border rounded-lg text-xs text-slate-300 hover:text-white hover:border-accent transition-colors disabled:opacity-40">
               {testing ? <Loader size={14} className="animate-spin" /> : 'Test'}
@@ -97,6 +108,12 @@ function ProviderCard({ def, health, onSave, onTest }) {
             className="px-3 py-2 bg-primary rounded-lg text-white text-xs hover:bg-primary/90 disabled:opacity-40 transition-colors">
             {saving ? <Loader size={14} className="animate-spin" /> : 'Save'}
           </button>
+          {def.configured && (
+            <button onClick={clear} disabled={saving}
+              className="px-3 py-2 bg-danger/10 border border-danger/20 rounded-lg text-danger text-xs hover:bg-danger/20 disabled:opacity-40 transition-colors">
+              Clear
+            </button>
+          )}
         </div>
       )}
     </div>
@@ -113,30 +130,40 @@ export default function SettingsPage() {
 
   const load = async () => {
     try {
-      const [keysRes, healthRes] = await Promise.all([
-        axios.get(`${API_BASE}/api/settings/keys`),
-        axios.get(`${API_BASE}/api/chat/health`),
+      const [keysRes, healthRes, personalityRes] = await Promise.all([
+        settingsAPI.getKeys(),
+        chatAPI.health(),
+        settingsAPI.getPersonality(),
       ]);
       setKeyDefs(keysRes.data.keys || []);
       const hMap = {};
       (healthRes.data.providers || []).forEach(p => { hMap[p.id] = p; });
       setHealth(hMap);
       setCacheStats(healthRes.data.cache);
+      if (personalityRes.data?.tone) setTone(personalityRes.data.tone);
+      if (personalityRes.data?.systemPrompt) setPrompt(personalityRes.data.systemPrompt);
     } catch { toast.error('Failed to load settings'); }
     finally { setLoading(false); }
   };
 
   useEffect(() => { load(); }, []);
 
-  const savePersonality = () => {
-    localStorage.setItem('luna_tone', tone);
-    localStorage.setItem('luna_prompt', prompt);
-    toast.success('Personality saved! 🌙');
+  const savePersonality = async () => {
+    try {
+      await settingsAPI.savePersonality({ tone, systemPrompt: prompt });
+      toast.success('Personality saved to this browser session! 🌙');
+    } catch { toast.error('Failed to save personality'); }
   };
 
-  const clearSession = () => {
-    localStorage.clear();
-    toast.success('Session cleared!');
+  const clearSession = async () => {
+    try {
+      await settingsAPI.clearSession();
+      localStorage.clear();
+      setTone(LUNA_PERSONALITY.tone);
+      setPrompt(LUNA_PERSONALITY.systemPrompt);
+      toast.success('All session data cleared!');
+      load();
+    } catch { toast.error('Failed to clear session data'); }
   };
 
   const categories = ['AI', 'Media', 'Search'];
@@ -145,7 +172,8 @@ export default function SettingsPage() {
     <div className="max-w-3xl mx-auto pt-16 md:pt-0">
       <div className="mb-6 pt-4">
         <h1 className="text-2xl font-bold text-white flex items-center gap-2">⚙️ Settings</h1>
-        <p className="text-slate-400 text-sm">Connect providers and teach Luna how to work with you</p>
+        <p className="text-xs text-slate-500 mb-2">Connect providers and teach Luna how to work with you</p>
+        <p className="text-xs text-slate-500">Keys are encrypted on the backend and scoped to this browser session. Never share your session or paste keys into chat.</p>
       </div>
 
       {/* Provider Health Dashboard */}
@@ -195,9 +223,10 @@ export default function SettingsPage() {
                   <ProviderCard
                     key={def.key}
                     def={def}
-                    health={health[def.key?.replace('_API_KEY','').toLowerCase()]}
+                    health={health[({
+                      HF_API_KEY: 'huggingface',
+                    }[def.key] || def.key.replace('_API_KEY', '').toLowerCase())]}
                     onSave={load}
-                    onTest={load}
                   />
                 ))}
               </div>

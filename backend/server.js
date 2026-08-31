@@ -4,12 +4,24 @@ const express = require('express');
 const cors = require('cors');
 const cache = require('./services/cache-manager');
 const limits = require('./middleware/rateLimiter');
+const { anonymousSession } = require('./middleware/anonymousSession');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+const allowedOrigins = (process.env.FRONTEND_URL || '')
+  .split(',')
+  .map(origin => origin.trim())
+  .filter(Boolean);
 
-app.use(cors({ origin: process.env.FRONTEND_URL || '*' }));
+app.use(cors({
+  origin(origin, callback) {
+    if (!origin || !allowedOrigins.length || allowedOrigins.includes(origin)) return callback(null, origin || true);
+    return callback(new Error('Origin is not allowed by CORS'));
+  },
+  credentials: true,
+}));
 app.use(express.json({ limit: '10mb' }));
+app.use(anonymousSession);
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Routes
@@ -18,7 +30,7 @@ app.use('/api/image',     limits.image,     require('./routes/image'));
 app.use('/api/documents', limits.documents, require('./routes/documents'));
 app.use('/api/research',  limits.research,  require('./routes/research'));
 app.use('/api/student',   limits.student,  require('./routes/student'));
-app.use('/api/settings',  require('./routes/settings'));
+app.use('/api/settings',  limits.settings,  require('./routes/settings'));
 
 // Health check
 app.get('/api/health', (req, res) => {

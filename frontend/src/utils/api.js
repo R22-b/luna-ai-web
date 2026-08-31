@@ -3,6 +3,7 @@ import axios from 'axios';
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || '/api',
   timeout: 60000,
+  withCredentials: true,
 });
 
 api.interceptors.response.use(
@@ -36,6 +37,10 @@ export const researchAPI = {
 export const settingsAPI = {
   getKeys: () => api.get('/settings/keys'),
   saveKeys: (keys, clear = []) => api.post('/settings/keys', { keys, clear }),
+  testProvider: (provider) => api.post('/settings/test', { provider }),
+  getPersonality: () => api.get('/settings/personality'),
+  savePersonality: (personality) => api.post('/settings/personality', personality),
+  clearSession: () => api.delete('/settings/session'),
   getProfile: () => api.get('/settings/profile'),
   saveProfile: (profile) => api.post('/settings/profile', profile),
 };

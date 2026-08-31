@@ -7,7 +7,7 @@ import { chatAPI } from '../utils/api';
 import { CacheIndicator, ProviderBadge } from '../components/shared';
 import LUNA_PERSONALITY from '../personality';
 
-const API_BASE = import.meta.env.VITE_API_URL || '';
+const API_BASE = (import.meta.env.VITE_API_URL || '/api').replace(/\/$/, '');
 const COMPRESS_EVERY = 20;
 const SESSION_KEY = 'luna_chat_session';
 
@@ -215,10 +215,9 @@ export default function ChatPage() {
         message: userMsg.content,
         history: encodeURIComponent(JSON.stringify(history)),
         taskType,
-        systemPrompt: LUNA_PERSONALITY.systemPrompt,
       });
 
-      const evtSource = new EventSource(`${API_BASE}/api/chat/stream?${params}`);
+      const evtSource = new EventSource(`${API_BASE}/chat/stream?${params}`, { withCredentials: true });
       setStreaming(true);
       setLoading(false);
       let fullText = '';

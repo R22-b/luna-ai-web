@@ -302,7 +302,11 @@ Restart the backend after changing `.env`.
 5. Use the connection test when available.
 6. Confirm that the provider shows as configured and that only the masked last four characters are displayed.
 
-The backend stores saved keys in `backend/.luna-data/`, which is ignored by Git. Do not delete the ignore rule or commit this directory.
+The backend stores saved keys in an encrypted `sessions.json` file under `backend/.luna-data/`, which is ignored by Git. Each browser receives a signed, HttpOnly `luna_session` cookie, and saved keys are scoped to that anonymous browser session. The API returns only configuration status and the last four characters; raw keys are never sent back to the frontend. Do not delete the ignore rule or commit this directory.
+
+This is an anonymous BYOK system, not an account system. Clearing cookies, changing browsers, or using a private window creates a different session. Anyone who obtains the session cookie could use that session's saved keys, so users should not share their browser session. The application does not send provider keys to other users or expose them in browser JavaScript.
+
+For Render, the encrypted data directory must be placed on durable storage. Set `LUNA_DATA_DIR` to the mount path of a persistent disk and set a stable `LUNA_MASTER_KEY` secret. Without durable storage, a service restart or redeploy can remove the locally saved BYOK keys. The master key must remain unchanged or previously saved data cannot be decrypted.
 
 ## Deploying to Vercel
 
@@ -354,7 +358,7 @@ npm install
 node server.js
 ```
 
-The service must expose the configured port, provide the environment variables from `.env.example`, allow CORS requests from the Vercel frontend, and preserve the backend’s writable local data directory if encrypted settings storage is enabled. For a public multi-user service, replace the local settings store with authenticated, per-user secret storage before accepting user keys.
+The service must expose the configured port, provide the environment variables from `.env.example`, allow credentialed CORS requests from the Vercel frontend, and preserve the backend’s writable local data directory if encrypted settings storage is enabled. For the anonymous BYOK model, set `FRONTEND_URL` to the exact frontend origin, set a stable `LUNA_MASTER_KEY`, and mount persistent storage at the path used by `LUNA_DATA_DIR`. This keeps each anonymous browser session isolated without requiring account authentication.
 
 ## API Reference
 

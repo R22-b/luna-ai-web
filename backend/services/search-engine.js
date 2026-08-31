@@ -4,11 +4,11 @@ const cheerio = require('cheerio');
 require('dotenv').config();
 const settings = require('./settings-store');
 
-async function searchSerper(query, num = 5) {
+async function searchSerper(query, num = 5, sessionId = null) {
   const res = await fetch('https://google.serper.dev/search', {
     method: 'POST',
     headers: {
-      'X-API-KEY': settings.getKey('SERPER_API_KEY'),
+      'X-API-KEY': settings.getKey('SERPER_API_KEY', sessionId),
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({ q: query, num }),
@@ -18,10 +18,10 @@ async function searchSerper(query, num = 5) {
   return (data.organic || []).map(r => ({ title: r.title, url: r.link, snippet: r.snippet }));
 }
 
-async function searchBrave(query, num = 5) {
+async function searchBrave(query, num = 5, sessionId = null) {
   const res = await fetch(
     `https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(query)}&count=${num}`,
-    { headers: { 'Accept': 'application/json', 'X-Subscription-Token': settings.getKey('BRAVE_API_KEY') } }
+    { headers: { 'Accept': 'application/json', 'X-Subscription-Token': settings.getKey('BRAVE_API_KEY', sessionId) } }
   );
   if (!res.ok) throw new Error('Brave failed');
   const data = await res.json();
@@ -60,14 +60,14 @@ async function fetchPageContent(url) {
   }
 }
 
-async function search(query, numResults = 5) {
+async function search(query, numResults = 5, sessionId = null) {
   let results = [];
   // Try providers in order
-  if (settings.getKey('SERPER_API_KEY')) {
-    try { results = await searchSerper(query, numResults); } catch (e) { console.warn('Serper failed:', e.message); }
+  if (settings.getKey('SERPER_API_KEY', sessionId)) {
+    try { results = await searchSerper(query, numResults, sessionId); } catch (e) { console.warn('Serper failed:', e.message); }
   }
-  if (!results.length && settings.getKey('BRAVE_API_KEY')) {
-    try { results = await searchBrave(query, numResults); } catch (e) { console.warn('Brave failed:', e.message); }
+  if (!results.length && settings.getKey('BRAVE_API_KEY', sessionId)) {
+    try { results = await searchBrave(query, numResults, sessionId); } catch (e) { console.warn('Brave failed:', e.message); }
   }
   if (!results.length) {
     try { results = await searchDuckDuckGo(query); } catch (e) { console.warn('DDG failed:', e.message); }

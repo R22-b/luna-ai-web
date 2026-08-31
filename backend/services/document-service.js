@@ -5,7 +5,7 @@ const pptx = require('pptxgenjs');
 const ExcelJS = require('exceljs');
 const { chat } = require('./brain-manager');
 
-async function generateContent(topic, instructions, pages) {
+async function generateContent(topic, instructions, pages, sessionId = null) {
   const prompt = `You are a professional document writer. Create structured content for a document.
 Topic: ${topic}
 Instructions: ${instructions}
@@ -24,7 +24,7 @@ Respond ONLY with valid JSON in this exact format:
   "summary": "Brief summary of the document"
 }`;
 
-  const result = await chat([{ role: 'user', content: prompt }], 'chat');
+  const result = await chat([{ role: 'user', content: prompt }], 'chat', null, sessionId);
   try {
     const jsonMatch = result.response.match(/\{[\s\S]*\}/);
     return JSON.parse(jsonMatch[0]);
@@ -37,8 +37,8 @@ Respond ONLY with valid JSON in this exact format:
   }
 }
 
-async function generateWord(topic, instructions, pages) {
-  const content = await generateContent(topic, instructions, pages);
+async function generateWord(topic, instructions, pages, sessionId = null) {
+  const content = await generateContent(topic, instructions, pages, sessionId);
   const children = [
     new Paragraph({
       alignment: AlignmentType.CENTER,
@@ -66,8 +66,8 @@ async function generateWord(topic, instructions, pages) {
   return await Packer.toBuffer(doc);
 }
 
-async function generatePDF(topic, instructions, pages) {
-  const content = await generateContent(topic, instructions, pages);
+async function generatePDF(topic, instructions, pages, sessionId = null) {
+  const content = await generateContent(topic, instructions, pages, sessionId);
   const pdfSafe = value => String(value ?? '').replace(/[^\x00-\x7F]/g, '');
   const pdfDoc = await PDFDocument.create();
   const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
@@ -112,8 +112,8 @@ async function generatePDF(topic, instructions, pages) {
   return await pdfDoc.save();
 }
 
-async function generatePPT(topic, instructions, pages) {
-  const content = await generateContent(topic, instructions, pages);
+async function generatePPT(topic, instructions, pages, sessionId = null) {
+  const content = await generateContent(topic, instructions, pages, sessionId);
   const prs = new pptx();
   prs.layout = 'LAYOUT_WIDE';
   prs.defineLayout({ name: 'LAYOUT_WIDE', width: 13.33, height: 7.5 });
@@ -139,8 +139,8 @@ async function generatePPT(topic, instructions, pages) {
   return await prs.write({ outputType: 'nodebuffer' });
 }
 
-async function generateExcel(topic, instructions) {
-  const content = await generateContent(topic, instructions, 2);
+async function generateExcel(topic, instructions, sessionId = null) {
+  const content = await generateContent(topic, instructions, 2, sessionId);
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'Luna AI Web | github.com/R22-b';
   const sheet = workbook.addWorksheet(topic.substring(0, 30));

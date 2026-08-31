@@ -4,17 +4,19 @@ const router = express.Router();
 const { search } = require('../services/search-engine');
 const { chat } = require('../services/brain-manager');
 const cache = require('../services/cache-manager');
+const { getOrCreateSessionId } = require('../middleware/anonymousSession');
 
 router.post('/', async (req, res) => {
   try {
+    const sessionId = getOrCreateSessionId(req, res);
     const { query, depth = 'standard', sources: numSources = 5 } = req.body;
     if (!query) return res.status(400).json({ error: 'Query is required' });
 
-    const cacheKey = { query: query.trim(), depth };
+    const cacheKey = { sessionId, query: query.trim(), depth };
     const cached = cache.get('search', cacheKey);
     if (cached) return res.json(cached);
 
-    const results = await search(query, numSources);
+    const results = await search(query, numSources, sessionId);
     if (!results.length) return res.status(404).json({ error: 'No results found' });
 
     // Summarize each source
@@ -22,7 +24,7 @@ router.post('/', async (req, res) => {
       const text = r.content || r.snippet || '';
       if (!text) return { ...r, summary: r.snippet || 'No content available' };
       try {
-        const s = await chat([{ role: 'user', content: `Summarize in 2-3 sentences:\n${text.substring(0, 2000)}` }], 'fast');
+        const s = await chat([{ role: 'user', content: `Summarize in 2-3 sentences:\n${text.substring(0, 2000)}` }], 'fast', null, sessionId);
         return { ...r, summary: s.response };
       } catch {
         return { ...r, summary: r.snippet || 'Summary unavailable' };
@@ -34,7 +36,7 @@ router.post('/', async (req, res) => {
     const synthesis = await chat([{
       role: 'user',
       content: `Based on these sources, write a comprehensive research report about "${query}":\n\n${sourcesText}\n\nWrite in clear paragraphs with a conclusion.`,
-    }], 'research');
+    }], 'research', null, sessionId);
 
     const result = {
       query,

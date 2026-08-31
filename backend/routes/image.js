@@ -4,6 +4,7 @@ const router = express.Router();
 const fetch = require('node-fetch');
 const cache = require('../services/cache-manager');
 const settings = require('../services/settings-store');
+const { getOrCreateSessionId } = require('../middleware/anonymousSession');
 
 const STYLE_PROMPTS = {
   realistic: ', photorealistic, 8k, highly detailed, professional photography, sharp focus',
@@ -31,8 +32,8 @@ function generateLocalDemoImage(prompt, width = 1024, height = 1024) {
   return `data:image/png;base64,${png}`;
 }
 
-async function generateHuggingFace(prompt) {
-  const key = settings.getKey('HF_API_KEY');
+async function generateHuggingFace(prompt, sessionId) {
+  const key = settings.getKey('HF_API_KEY', sessionId);
   const headers = { 'Content-Type': 'application/json', ...(key ? { Authorization: `Bearer ${key}` } : {}) };
   const res = await fetch('https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0', {
     method: 'POST', headers, body: JSON.stringify({ inputs: prompt }),
@@ -44,23 +45,24 @@ async function generateHuggingFace(prompt) {
 
 router.post('/generate', async (req, res) => {
   try {
+    const sessionId = getOrCreateSessionId(req, res);
     const { prompt, style = 'realistic', width = 1024, height = 1024 } = req.body;
     if (!prompt) return res.status(400).json({ error: 'Prompt is required' });
 
     const stylePrompt = prompt + (STYLE_PROMPTS[style] || '');
-    const cacheKey = { prompt: stylePrompt, width, height };
+    const cacheKey = { sessionId, prompt: stylePrompt, width, height };
     const cached = cache.get('image', cacheKey);
     if (cached) return res.json(cached);
 
     let imageData, provider;
-    const hasImageKey = settings.getKey('HF_API_KEY') || settings.getKey('LEONARDO_API_KEY');
+    const hasImageKey = settings.getKey('HF_API_KEY', sessionId) || settings.getKey('LEONARDO_API_KEY', sessionId);
     try {
       if (!hasImageKey) throw new Error('No image provider key configured; use local demo image');
       imageData = await generatePollinations(stylePrompt, width, height);
       provider = 'Pollinations (FLUX)';
     } catch {
       try {
-        imageData = await generateHuggingFace(stylePrompt);
+        imageData = await generateHuggingFace(stylePrompt, sessionId);
         provider = 'HuggingFace (SDXL)';
       } catch (e) {
         imageData = generateLocalDemoImage(stylePrompt, width, height);

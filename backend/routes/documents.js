@@ -2,6 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const { generateWord, generatePDF, generatePPT, generateExcel } = require('../services/document-service');
+const { getOrCreateSessionId } = require('../middleware/anonymousSession');
 
 const TYPES = {
   word:  { fn: generateWord,  ext: 'docx', mime: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' },
@@ -12,12 +13,13 @@ const TYPES = {
 
 router.post('/generate', async (req, res) => {
   try {
+    const sessionId = getOrCreateSessionId(req, res);
     const { type = 'word', topic, instructions = '', pages = 3 } = req.body;
     if (!topic) return res.status(400).json({ error: 'Topic is required' });
     const docType = TYPES[type];
     if (!docType) return res.status(400).json({ error: `Invalid type. Use: ${Object.keys(TYPES).join(', ')}` });
 
-    const buffer = await docType.fn(topic, instructions, pages);
+    const buffer = await docType.fn(topic, instructions, pages, sessionId);
     const filename = `Luna_${topic.replace(/\s+/g, '_').substring(0, 30)}.${docType.ext}`;
     res.setHeader('Content-Type', docType.mime);
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);

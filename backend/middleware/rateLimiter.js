@@ -13,4 +13,5 @@ module.exports = {
   documents: make(5),
   research: make(10),
   student:  make(10),
+  settings: make(60),
 };

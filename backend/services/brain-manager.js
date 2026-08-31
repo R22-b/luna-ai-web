@@ -49,10 +49,10 @@ for (const id of Object.keys(PROVIDERS)) {
 // Routing log per request (for Provider Info button)
 let lastRoutingLog = [];
 
-function getKey(id) {
+function getKey(id, sessionId = null) {
   if (id === 'pollinations') return null;
   const envName = KEY_MAP[id];
-  return envName ? settings.getKey(envName) : null;
+  return envName ? settings.getKey(envName, sessionId) : null;
 }
 
 // ── CAPABILITY-BASED ROUTING ─────────────────────────────────
@@ -79,12 +79,12 @@ function getProvidersForTask(taskType) {
 }
 
 // ── CALLER FUNCTIONS ─────────────────────────────────────────
-async function callOpenAI(id, messages, model) {
+async function callOpenAI(id, messages, model, sessionId) {
   const p = PROVIDERS[id];
   const r = REGISTRY[id];
   const headers = {
     'Content-Type': 'application/json',
-    'Authorization': `Bearer ${getKey(id)}`,
+    'Authorization': `Bearer ${getKey(id, sessionId)}`,
   };
   if (id === 'openrouter') {
     headers['HTTP-Referer'] = 'https://luna-ai-web.vercel.app';
@@ -99,7 +99,7 @@ async function callOpenAI(id, messages, model) {
   return data.choices[0].message.content;
 }
 
-async function callGemini(messages) {
+async function callGemini(messages, sessionId) {
   const r = REGISTRY.gemini;
   const contents = messages
     .filter(m => m.role !== 'system')
@@ -108,7 +108,7 @@ async function callGemini(messages) {
   const body = { contents };
   if (systemInstruction) body.system_instruction = { parts: [{ text: systemInstruction.content }] };
   const res = await fetch(
-    `${PROVIDERS.gemini.baseUrl}/models/${r.models[0]}:generateContent?key=${getKey('gemini')}`,
+    `${PROVIDERS.gemini.baseUrl}/models/${r.models[0]}:generateContent?key=${getKey('gemini', sessionId)}`,
     { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
   );
   if (!res.ok) throw new Error(`gemini HTTP ${res.status}`);
@@ -116,14 +116,14 @@ async function callGemini(messages) {
   return data.candidates[0].content.parts[0].text;
 }
 
-async function callCohere(messages) {
+async function callCohere(messages, sessionId) {
   const chatHistory = messages.slice(0, -1)
     .filter(m => m.role !== 'system')
     .map(m => ({ role: m.role === 'assistant' ? 'CHATBOT' : 'USER', message: m.content }));
   const lastMsg = messages[messages.length - 1].content;
   const res = await fetch(`${PROVIDERS.cohere.baseUrl}/chat`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getKey('cohere')}` },
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getKey('cohere', sessionId)}` },
     body: JSON.stringify({ model: REGISTRY.cohere.models[0], message: lastMsg, chat_history: chatHistory }),
   });
   if (!res.ok) throw new Error(`cohere HTTP ${res.status}`);
@@ -131,9 +131,9 @@ async function callCohere(messages) {
   return data.text;
 }
 
-async function callHuggingFace(messages) {
+async function callHuggingFace(messages, sessionId) {
   const prompt = messages.map(m => `${m.role}: ${m.content}`).join('\n') + '\nassistant:';
-  const key = getKey('huggingface');
+  const key = getKey('huggingface', sessionId);
   const res = await fetch(`${PROVIDERS.huggingface.baseUrl}/${REGISTRY.huggingface.models[0]}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...(key ? { 'Authorization': `Bearer ${key}` } : {}) },
@@ -179,18 +179,18 @@ function localDemoResponse(messages) {
   return `Hey! I'm Luna AI 🌙. I’m running in keyless local demo mode, so I can still respond while external providers are unavailable. Here’s a helpful starting point for your request: ${prompt.slice(0, 300)}`;
 }
 
-async function callProvider(id, messages, model) {
+async function callProvider(id, messages, model, sessionId) {
   if (!PROVIDERS[id]) throw new Error(`Unknown provider: ${id}`);
-  if (!getKey(id) && id !== 'pollinations') throw new Error(`No API key for ${id}`);
+  if (!getKey(id, sessionId) && id !== 'pollinations') throw new Error(`No API key for ${id}`);
   const start = Date.now();
   let response;
   switch (PROVIDERS[id].format) {
-    case 'openai':       response = await callOpenAI(id, messages, model); break;
-    case 'gemini':       response = await callGemini(messages); break;
-    case 'cohere':       response = await callCohere(messages); break;
-    case 'huggingface':  response = await callHuggingFace(messages); break;
+    case 'openai':       response = await callOpenAI(id, messages, model, sessionId); break;
+    case 'gemini':       response = await callGemini(messages, sessionId); break;
+    case 'cohere':       response = await callCohere(messages, sessionId); break;
+    case 'huggingface':  response = await callHuggingFace(messages, sessionId); break;
     case 'pollinations': {
-      const hasAnyConfiguredKey = Object.values(KEY_MAP).some(envName => settings.getKey(envName));
+          const hasAnyConfiguredKey = Object.values(KEY_MAP).some(envName => settings.getKey(envName, sessionId));
       if (!hasAnyConfiguredKey) {
         response = localDemoResponse(messages);
       } else {
@@ -213,18 +213,18 @@ async function callProvider(id, messages, model) {
 }
 
 // ── MAIN CHAT FUNCTION ───────────────────────────────────────
-async function chat(messages, taskType = 'chat', preferredModel = null) {
+async function chat(messages, taskType = 'chat', preferredModel = null, sessionId = null) {
   const providers = getProvidersForTask(taskType);
   lastRoutingLog = [];
 
   for (const id of providers) {
-    if (!health[id].alive) {
+    if (!health[id].alive && !sessionId) {
       lastRoutingLog.push({ provider: REGISTRY[id]?.name || id, status: 'skipped', reason: 'marked dead' });
       continue;
     }
     try {
       lastRoutingLog.push({ provider: REGISTRY[id]?.name || id, status: 'trying', reason: null });
-      const response = await callProvider(id, messages, preferredModel);
+      const response = await callProvider(id, messages, preferredModel, sessionId);
       lastRoutingLog[lastRoutingLog.length - 1].status = 'success';
       return {
         response,
@@ -251,13 +251,13 @@ async function chat(messages, taskType = 'chat', preferredModel = null) {
 }
 
 // ── STREAMING CHAT ───────────────────────────────────────────
-async function chatStream(messages, taskType = 'chat', res) {
+async function chatStream(messages, taskType = 'chat', res, sessionId = null) {
   const providers = getProvidersForTask(taskType);
   const log = [];
 
   for (const id of providers) {
-    if (!health[id].alive) continue;
-    const key = getKey(id);
+    if (!health[id].alive && !sessionId) continue;
+    const key = getKey(id, sessionId);
     if (!key && id !== 'pollinations') continue;
 
     try {
@@ -298,7 +298,7 @@ async function chatStream(messages, taskType = 'chat', res) {
       }
 
       // Non-streaming fallback — full response then stream it word by word
-      const response = await callProvider(id, messages, null);
+      const response = await callProvider(id, messages, null, sessionId);
       const words = response.split(' ');
       for (const word of words) {
         send({ type: 'token', token: word + ' ' });
@@ -321,12 +321,12 @@ async function chatStream(messages, taskType = 'chat', res) {
   res.end();
 }
 
-function getHealthStatus() {
+function getHealthStatus(sessionId = null) {
   return Object.entries(REGISTRY).map(([id, r]) => ({
     id,
     name: r.name,
     alive: health[id]?.alive ?? true,
-    hasKey: !!getKey(id) || id === 'pollinations',
+    hasKey: !!getKey(id, sessionId) || id === 'pollinations',
     latency: health[id]?.latency || 0,
     errors: health[id]?.errors || 0,
     lastError: health[id]?.lastError || null,
@@ -339,13 +339,19 @@ function getHealthStatus() {
   }));
 }
 
-function getAllModels() {
+function getAllModels(sessionId = null) {
   return Object.entries(REGISTRY).flatMap(([id, r]) => {
-    if (!getKey(id) && id !== 'pollinations') return [];
+    if (!getKey(id, sessionId) && id !== 'pollinations') return [];
     return r.models.map(m => ({ provider: id, providerName: r.name, model: m }));
   });
 }
 
+async function testProvider(id, sessionId = null) {
+  if (!PROVIDERS[id]) throw new Error(`Unknown provider: ${id}`);
+  const response = await callProvider(id, [{ role: 'user', content: 'Say "OK" and nothing else.' }], null, sessionId);
+  return { provider: REGISTRY[id]?.name || id, response };
+}
+
 function getLastRoutingLog() { return lastRoutingLog; }
 
-module.exports = { chat, chatStream, getHealthStatus, getAllModels, getLastRoutingLog, REGISTRY };
+module.exports = { chat, chatStream, testProvider, getHealthStatus, getAllModels, getLastRoutingLog, REGISTRY };

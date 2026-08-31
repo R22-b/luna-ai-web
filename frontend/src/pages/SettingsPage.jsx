@@ -32,15 +32,18 @@ function ProviderCard({ def, health, onSave }) {
     : health?.errors > 0 ? 'limited'
     : 'healthy';
 
-  const save = async () => {
-    if (!value.trim()) return toast.error('Paste an API key first!');
+  const save = async (rawValue = value, silent = false) => {
+    const trimmed = rawValue.trim();
+    if (!trimmed) return;
     setSaving(true);
     try {
-      await settingsAPI.saveKeys({ [def.key]: value.trim() });
-      setValue(''); toast.success(`${def.label} key saved to this browser session! 🔒`);
+      await settingsAPI.saveKeys({ [def.key]: trimmed });
+      setValue('');
+      if (!silent) toast.success(`${def.label} key saved to this browser session! 🔒`);
       onSave();
-    } catch { toast.error('Failed to save key'); }
-    finally { setSaving(false); }
+    } catch (err) {
+      toast.error(err.message || 'Failed to save key');
+    } finally { setSaving(false); }
   };
 
   const test = async () => {
@@ -50,7 +53,9 @@ function ProviderCard({ def, health, onSave }) {
       if (data.ok) toast.success(`${def.label} is working! 🟢`);
       else toast.error(`${def.label} failed: ${data.error}`);
       onSave();
-    } catch { toast.error('Test failed');     } finally { setTesting(false); }
+    } catch (err) {
+      toast.error(err.message || 'Test failed');
+    } finally { setTesting(false); }
   };
 
   const clear = async () => {
@@ -90,6 +95,11 @@ function ProviderCard({ def, health, onSave }) {
               type={show ? 'text' : 'password'}
               value={value}
               onChange={e => setValue(e.target.value)}
+              onPaste={e => {
+                const pasted = e.clipboardData.getData('text');
+                setTimeout(() => save(pasted, true), 0);
+              }}
+              onBlur={() => save(value, true)}
               onKeyDown={e => e.key === 'Enter' && save()}
               placeholder={def.configured ? `••••${def.lastFour || '••••'}` : 'Paste API key here...'}
               className="flex-1 bg-transparent text-sm text-white placeholder-slate-600 outline-none"
@@ -104,7 +114,7 @@ function ProviderCard({ def, health, onSave }) {
               {testing ? <Loader size={14} className="animate-spin" /> : 'Test'}
             </button>
           )}
-          <button onClick={save} disabled={saving || !value.trim()}
+          <button onClick={() => save()} disabled={saving || !value.trim()}
             className="px-3 py-2 bg-primary rounded-lg text-white text-xs hover:bg-primary/90 disabled:opacity-40 transition-colors">
             {saving ? <Loader size={14} className="animate-spin" /> : 'Save'}
           </button>

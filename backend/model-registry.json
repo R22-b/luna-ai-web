@@ -7,7 +7,7 @@
     "free": true,
     "noKeyNeeded": false,
     "priority": 1,
-    "models": ["llama-3.1-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768", "gemma2-9b-it"]
+    "models": ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "openai/gpt-oss-120b", "openai/gpt-oss-20b"]
   },
   "gemini": {
     "name": "Google Gemini",
@@ -17,7 +17,7 @@
     "free": true,
     "noKeyNeeded": false,
     "priority": 2,
-    "models": ["gemini-1.5-flash", "gemini-1.5-flash-8b", "gemini-2.0-flash-exp"]
+    "models": ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.5-pro"]
   },
   "openrouter": {
     "name": "OpenRouter",
@@ -86,7 +86,7 @@
     "free": true,
     "noKeyNeeded": false,
     "priority": 8,
-    "models": ["mistralai/Mistral-7B-Instruct-v0.3", "HuggingFaceH4/zephyr-7b-beta"]
+    "models": ["openai/gpt-oss-120b:fastest", "deepseek-ai/DeepSeek-V3-0324:fastest"]
   },
   "deepseek": {
     "name": "DeepSeek",

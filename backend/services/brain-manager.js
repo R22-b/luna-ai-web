@@ -18,7 +18,9 @@ const PROVIDERS = {
   cohere:      { baseUrl: 'https://api.cohere.com/v1',                                   format: 'cohere' },
   mistral:     { baseUrl: 'https://api.mistral.ai/v1',                                   format: 'openai' },
   together:    { baseUrl: 'https://api.together.xyz/v1',                                 format: 'openai' },
-  huggingface: { baseUrl: 'https://api-inference.huggingface.co/models',                 format: 'huggingface' },
+  // Hugging Face retired the legacy api-inference hostname for this flow.
+  // The router endpoint is OpenAI-compatible and supports provider selection policies.
+  huggingface: { baseUrl: 'https://router.huggingface.co/v1',                        format: 'openai' },
   deepseek:    { baseUrl: 'https://api.deepseek.com/v1',                                 format: 'openai' },
   cerebras:    { baseUrl: 'https://api.cerebras.ai/v1',                                  format: 'openai' },
   sambanova:   { baseUrl: 'https://fast-api.snova.ai/v1',                                format: 'openai' },
@@ -94,7 +96,10 @@ async function callOpenAI(id, messages, model, sessionId) {
     method: 'POST', headers,
     body: JSON.stringify({ model: model || r.models[0], messages, max_tokens: 2048, temperature: 0.7 }),
   });
-  if (!res.ok) throw new Error(`${id} HTTP ${res.status}`);
+  if (!res.ok) {
+    const detail = (await res.text()).slice(0, 300);
+    throw new Error(`${id} HTTP ${res.status}${detail ? `: ${detail}` : ''}`);
+  }
   const data = await res.json();
   return data.choices[0].message.content;
 }
@@ -111,7 +116,10 @@ async function callGemini(messages, sessionId) {
     `${PROVIDERS.gemini.baseUrl}/models/${r.models[0]}:generateContent?key=${getKey('gemini', sessionId)}`,
     { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
   );
-  if (!res.ok) throw new Error(`gemini HTTP ${res.status}`);
+  if (!res.ok) {
+    const detail = (await res.text()).slice(0, 300);
+    throw new Error(`gemini HTTP ${res.status}${detail ? `: ${detail}` : ''}`);
+  }
   const data = await res.json();
   return data.candidates[0].content.parts[0].text;
 }
@@ -126,7 +134,10 @@ async function callCohere(messages, sessionId) {
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getKey('cohere', sessionId)}` },
     body: JSON.stringify({ model: REGISTRY.cohere.models[0], message: lastMsg, chat_history: chatHistory }),
   });
-  if (!res.ok) throw new Error(`cohere HTTP ${res.status}`);
+  if (!res.ok) {
+    const detail = (await res.text()).slice(0, 300);
+    throw new Error(`cohere HTTP ${res.status}${detail ? `: ${detail}` : ''}`);
+  }
   const data = await res.json();
   return data.text;
 }
@@ -139,7 +150,10 @@ async function callHuggingFace(messages, sessionId) {
     headers: { 'Content-Type': 'application/json', ...(key ? { 'Authorization': `Bearer ${key}` } : {}) },
     body: JSON.stringify({ inputs: prompt, parameters: { max_new_tokens: 512 } }),
   });
-  if (!res.ok) throw new Error(`huggingface HTTP ${res.status}`);
+  if (!res.ok) {
+    const detail = (await res.text()).slice(0, 300);
+    throw new Error(`huggingface HTTP ${res.status}${detail ? `: ${detail}` : ''}`);
+  }
   const data = await res.json();
   return Array.isArray(data) ? data[0].generated_text.split('assistant:').pop().trim() : data.generated_text;
 }
@@ -188,7 +202,6 @@ async function callProvider(id, messages, model, sessionId) {
     case 'openai':       response = await callOpenAI(id, messages, model, sessionId); break;
     case 'gemini':       response = await callGemini(messages, sessionId); break;
     case 'cohere':       response = await callCohere(messages, sessionId); break;
-    case 'huggingface':  response = await callHuggingFace(messages, sessionId); break;
     case 'pollinations': {
           const hasAnyConfiguredKey = Object.values(KEY_MAP).some(envName => settings.getKey(envName, sessionId));
       if (!hasAnyConfiguredKey) {

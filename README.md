@@ -449,3 +449,7 @@ Permission is hereby granted, free of charge, to any person obtaining a copy of 
 
 [1]: https://gen.pollinations.ai/docs "Pollinations API Documentation"
 [2]: https://pollinations.ai/play "Pollinations API Playground"
+
+## Live Demo
+
+Try the deployed Luna AI Web application at [Open Live Demo](https://luna-ai-frontend.onrender.com/?v=2).
